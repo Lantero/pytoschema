@@ -290,7 +290,8 @@ class Service(typing.TypedDict, total=False):
     debug: bool
 ```
 
-The flag `total=False` is there to indicate that the properties are required, default value is `True`. See the result:
+The flag `total=False` is there to indicate that the properties are not required, default value is `True`. See the
+result:
 
 ```json
 {
