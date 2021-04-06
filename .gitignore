@@ -2,7 +2,6 @@
 .coverage
 
 .idea/
-.mypy_cache/
 .pytest_cache/
 htmlcov/
 pytoschema.egg-info/
