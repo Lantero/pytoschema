@@ -44,52 +44,58 @@ class UserProperties(TypedDict, total=False):
    status: Literal["ACTIVE", "DISABLED"]
    
 
-def update_user(user_id: str, user_properties: UserProperties):
+def update_user(user_id: str, user_properties: UserProperties) -> bool:
     pass  # Your function code
 ```
 
-We could now use the library to process this file, and it would create the following JSON schema:
+We could now use the library to process this file, and it would create the following JSON schemas:
 
 ```json
 {
     "update_user": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string"
-            },
-            "user_properties": {
-                "type": "object",
-                "properties": {
-                    "username": {
-                        "type": "string"
-                    },
-                    "is_superadmin": {
-                        "type": "boolean"
-                    },
-                    "groups": {
-                        "type": "array",
-                        "items": {
+        "input": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "type": "string"
+                },
+                "user_properties": {
+                    "type": "object",
+                    "properties": {
+                        "username": {
                             "type": "string"
+                        },
+                        "is_superadmin": {
+                            "type": "boolean"
+                        },
+                        "groups": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "status": {
+                            "enum": [
+                                "ACTIVE",
+                                "DISABLED"
+                            ]
                         }
                     },
-                    "status": {
-                        "enum": [
-                            "ACTIVE",
-                            "DISABLED"
-                        ]
-                    }
-                },
-                "required": [],
-                "additionalProperties": false
-            }
+                    "required": [],
+                    "additionalProperties": false
+                }
+            },
+            "required": [
+                "user_id",
+                "user_properties"
+            ],
+            "additionalProperties": false
         },
-        "required": [
-            "user_id",
-            "user_properties"
-        ],
-        "additionalProperties": false
+        "output": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "boolean"
+        }
     }
 }
 ```
@@ -100,7 +106,7 @@ This allows you to document and validate your functions in a single place, next 
 
 ### Installation
 
-From a Python 3.8+ environment, run `pip install pytoschema`.
+- `pip install pytoschema`.
 
 #### Supported versions
 
@@ -121,7 +127,7 @@ print(json.dumps(process_package(os.path.join("test", "example")), indent=4))
 ```
 
 The example package will be scanned and JSON schemas will be generated for all the top level functions it can find.
-  
+
 ### Scan a file
 
 You can also target specific files, which won't include the package namespacing in the result value. Following on the
@@ -351,14 +357,20 @@ Now compare it with its JSON schema representation:
 ```json
 {
     "my_func": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {
-            "a": {"type": "string"},
-            "b": {"type": "integer"}
+        "input": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+                "a": {"type": "string"},
+                "b": {"type": "integer"}
+            },
+            "required": ["a"],
+            "additionalProperties": false
         },
-        "required": ["a"],
-        "additionalProperties": false
+        "output": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "null"
+        }
     }
 }
 ```

@@ -30,13 +30,14 @@ def process_function_def(
             ast_function_def,
             f"Function '{ast_function_def.name}' contains a variable number positional arguments i.e. *args",
         )
-    schema = {
+    input_schema = {
         "$schema": JSON_SCHEMA_DRAFT,
         "type": "object",
         "properties": {},
         "required": [],
         "additionalProperties": False,
     }
+    output_schema = {"$schema": JSON_SCHEMA_DRAFT}
     # Process **kwargs
     if ast_function_def.args.kwarg is not None:
         if ast_function_def.args.kwarg.annotation is None:
@@ -45,7 +46,7 @@ def process_function_def(
                 f"Function '{ast_function_def.name}' is missing its "
                 f"**{ast_function_def.args.kwarg.arg} type annotation",
             )
-        schema["additionalProperties"] = get_schema_from_ast_element(
+        input_schema["additionalProperties"] = get_schema_from_ast_element(
             ast_function_def.args.kwarg.annotation, typing_namespace, name_to_schema_map
         )
     # Positional argument defaults is a non-padded list because you cannot have defaults before non-defaulted args
@@ -61,12 +62,21 @@ def process_function_def(
                 ast_function_def,
                 f"Function '{ast_function_def.name}' is missing type annotation for the parameter '{argument.arg}'",
             )
-        schema["properties"][argument.arg] = get_schema_from_ast_element(
+        input_schema["properties"][argument.arg] = get_schema_from_ast_element(
             argument.annotation, typing_namespace, name_to_schema_map
         )
         if default is None:
-            schema["required"].append(argument.arg)
-    return schema
+            input_schema["required"].append(argument.arg)
+    if ast_function_def.returns is not None:
+        output_schema.update(
+            get_schema_from_ast_element(ast_function_def.returns, typing_namespace, name_to_schema_map)
+        )
+    else:
+        output_schema["type"] = "null"
+    return {
+        "input": input_schema,
+        "output": output_schema,
+    }
 
 
 def filter_by_patterns(

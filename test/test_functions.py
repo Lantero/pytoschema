@@ -38,11 +38,17 @@ from .conftest import assert_expected_value_or_exception, TEST_TYPING_NAMESPACE
         [
             ast.parse("def foo(**bar: int): pass").body[0],
             {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {},
-                "required": [],
-                "additionalProperties": {"type": "integer"},
+                "input": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": {"type": "integer"},
+                },
+                "output": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "null",
+                },
             },
         ],
         [
@@ -54,21 +60,49 @@ from .conftest import assert_expected_value_or_exception, TEST_TYPING_NAMESPACE
         [
             ast.parse("def foo(a: int = 3): pass").body[0],
             {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {"a": {"type": "integer"}},
-                "required": [],
-                "additionalProperties": False,
+                "input": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {"a": {"type": "integer"}},
+                    "required": [],
+                    "additionalProperties": False,
+                },
+                "output": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "null",
+                },
             },
         ],
         [
             ast.parse("def foo(a: int): pass").body[0],
             {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {"a": {"type": "integer"}},
-                "required": ["a"],
-                "additionalProperties": False,
+                "input": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {"a": {"type": "integer"}},
+                    "required": ["a"],
+                    "additionalProperties": False,
+                },
+                "output": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "null",
+                },
+            },
+        ],
+        [
+            ast.parse("def foo() -> int: pass").body[0],
+            {
+                "input": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": False,
+                },
+                "output": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "integer",
+                },
             },
         ],
     ],
@@ -80,6 +114,7 @@ from .conftest import assert_expected_value_or_exception, TEST_TYPING_NAMESPACE
         "missing_arg",
         "arg_default",
         "arg_no_default",
+        "return",
     ],
 )
 def test_process_function_def(ast_function_def: ast.FunctionDef, expected: Schema):
@@ -122,11 +157,17 @@ def test_process_file():
         f.flush()
         assert process_file(f.name, None, ["bar*"]) == {
             "foo": {
-                "$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {"a": {"type": "integer"}},
-                "required": ["a"],
-                "additionalProperties": False,
+                "input": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {"a": {"type": "integer"}},
+                    "required": ["a"],
+                    "additionalProperties": False,
+                },
+                "output": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "null",
+                },
             }
         }
 
@@ -134,68 +175,104 @@ def test_process_file():
 def test_process_package():
     init_schema = {
         "example.version": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "additionalProperties": False,
-            "properties": {},
-            "required": [],
-            "type": "object",
+            "input": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": False,
+                "properties": {},
+                "required": [],
+                "type": "object",
+            },
+            "output": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "string",
+            },
         },
         "example.config.dev.common.get_config": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "additionalProperties": False,
-            "properties": {},
-            "required": [],
-            "type": "object",
+            "input": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": False,
+                "properties": {},
+                "required": [],
+                "type": "object",
+            },
+            "output": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": {
+                    "type": "string",
+                },
+                "type": "object",
+            },
         },
         "example.config.prod.common.get_config": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "additionalProperties": False,
-            "properties": {},
-            "required": [],
-            "type": "object",
+            "input": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": False,
+                "properties": {},
+                "required": [],
+                "type": "object",
+            },
+            "output": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": {
+                    "type": "string",
+                },
+                "type": "object",
+            },
         },
     }
     expected = {
         "example.service.start": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "additionalProperties": False,
-            "properties": {
-                "service": {
-                    "additionalProperties": False,
-                    "properties": {
-                        "address": {"type": "string"},
-                        "config": {
-                            "additionalProperties": {
-                                "anyOf": [
-                                    {"type": "object"},
-                                    {"type": "array"},
-                                    {"type": "null"},
-                                    {"type": "string"},
-                                    {"type": "boolean"},
-                                    {"type": "integer"},
-                                    {"type": "number"},
-                                ]
+            "input": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": False,
+                "properties": {
+                    "service": {
+                        "additionalProperties": False,
+                        "properties": {
+                            "address": {"type": "string"},
+                            "config": {
+                                "additionalProperties": {
+                                    "anyOf": [
+                                        {"type": "object"},
+                                        {"type": "array"},
+                                        {"type": "null"},
+                                        {"type": "string"},
+                                        {"type": "boolean"},
+                                        {"type": "integer"},
+                                        {"type": "number"},
+                                    ]
+                                },
+                                "type": "object",
                             },
-                            "type": "object",
+                            "state": {"enum": ["RUNNING", "STOPPED", "UNKNOWN"]},
+                            "debug": {"type": "boolean"},
+                            "port": {"anyOf": [{"type": "integer"}, {"type": "number"}]},
+                            "tags": {"items": {"type": "string"}, "type": "array"},
                         },
-                        "state": {"enum": ["RUNNING", "STOPPED", "UNKNOWN"]},
-                        "debug": {"type": "boolean"},
-                        "port": {"anyOf": [{"type": "integer"}, {"type": "number"}]},
-                        "tags": {"items": {"type": "string"}, "type": "array"},
-                    },
-                    "required": [],
-                    "type": "object",
-                }
+                        "required": [],
+                        "type": "object",
+                    }
+                },
+                "required": ["service"],
+                "type": "object",
             },
-            "required": ["service"],
-            "type": "object",
+            "output": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "null",
+            },
         },
         "example.service._secret": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "additionalProperties": False,
-            "properties": {"secret": {"anyOf": [{"type": "string"}, {"type": "null"}]}},
-            "required": [],
-            "type": "object",
+            "input": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "additionalProperties": False,
+                "properties": {"secret": {"anyOf": [{"type": "string"}, {"type": "null"}]}},
+                "required": [],
+                "type": "object",
+            },
+            "output": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "null",
+            },
         },
     }
     expected.update(init_schema)
