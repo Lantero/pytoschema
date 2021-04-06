@@ -7,9 +7,88 @@ Package that uses static analysis - `ast` - to convert Python 3 function type an
 - [https://docs.python.org/3/library/typing.html](https://docs.python.org/3/library/typing.html)
 - [https://json-schema.org/](https://json-schema.org/)
 
-This allows you to auto-generate the validation schemas for JSON-RPC backend functions written in Python.
+This allows you to auto-generate the validation schemas for JSON-RPC backend functions written in Python. For example,
+we can take this snippet:
+
+```python
+from typing import List, Literal, TypedDict
+
+class UserProperties(TypedDict, total=False):
+   username: str
+   is_superadmin: bool
+   groups: List[str]
+   status: Literal["ACTIVE", "DISABLED"]
+   
+
+def update_user(user_id: str, user_properties: UserProperties):
+    pass  # Your function code
+```
+
+It would produce this JSON schema to be used by other layers of your application, usually the front-end:
+
+```json
+{
+    "update_user": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string"
+            },
+            "user_properties": {
+                "type": "object",
+                "properties": {
+                    "username": {
+                        "type": "string"
+                    },
+                    "is_superadmin": {
+                        "type": "boolean"
+                    },
+                    "groups": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "status": {
+                        "enum": [
+                            "ACTIVE",
+                            "DISABLED"
+                        ]
+                    }
+                },
+                "required": [],
+                "additionalProperties": false
+            }
+        },
+        "required": [
+            "user_id",
+            "user_properties"
+        ],
+        "additionalProperties": false
+    }
+}
+```
 
 Current support is for Python 3.8+ and JSON schema draft 7+.
+
+## Table of contents
+
+1. [Getting started](#getting-started)
+   
+   1. [Installation](#installation)
+   2. [Scan a package](#scan-a-package)
+   3. [Scan a file](#scan-a-file)
+   4. [Include and exclude patterns](#include-and-exclude-patterns)
+   
+2. [Type annotation rules](#type-annotation-rules)
+
+   1. [Rules](#rules)
+   2. [Allowed types](#allowed-types)
+      
+      1. [Base types](#base-types)
+      2. [Custom types](#custom-types)
+      3. [Importing types from other files](#importing-types-from-other-files)
 
 ## Getting started
 
@@ -23,11 +102,11 @@ After installing the package, you can open a python terminal from the root of th
 
 ```python
 import os
-from pprint import pprint
+import json
 
 from pytoschema.functions import process_package
 
-pprint(process_package(os.path.join("test", "example")))
+print(json.dumps(process_package(os.path.join("test", "example")), indent=4))
 ```
 
 The example package will be scanned and JSON schemas will be generated for all the top level functions it can find.
@@ -40,7 +119,7 @@ same terminal:
 ```python
 from pytoschema.functions import process_file
 
-pprint(process_file(os.path.join("test", "example", "service.py")))
+print(json.dumps(process_file(os.path.join("test", "example", "service.py")), indent=4))
 ```
 
 #### Include and exclude patterns
@@ -49,13 +128,13 @@ Include and exclude unix-like patterns can be used to filter function and module
 scanning. See the difference when you now run this instead:
 
 ```python
-pprint(process_package(os.path.join("test", "example"), exclude_patterns=["_*"]))
+print(json.dumps(process_package(os.path.join("test", "example"), exclude_patterns=["_*"]), indent=4))
 ```
 
 Similarly, but applied to specific files:
 
 ```python
-pprint(process_file(os.path.join("test", "example", "service.py"), include_patterns=["_*"]))
+print(json.dumps(process_file(os.path.join("test", "example", "service.py"), include_patterns=["_*"]), indent=4))
 ```
 
 Things to take into account:
@@ -66,7 +145,25 @@ Things to take into account:
 ## Type annotation rules
 
 Fitting Python's typing model to JSON means not everything is allowed in your function signatures. This is a natural
-restriction that comes with JSON data serialization. Hopefully, most of the useful stuff you need is allowed.
+restriction that comes with JSON data serialization. Hopefully, most of the useful stuff you need is allowed, provided
+you follow these simple rules.
+
+#### Rules
+
+1. The functions you want to scan need to be type annotated.
+
+2. Function arguments are meant to be passed in key-value format, like a json object. This puts a couple of restrictions
+   regarding *args, **kwargs, positional-only and keyword-only arguments:
+   
+   The following is allowed:
+   - ****kwargs**: `def func(**kwargs): pass`
+   - **keyword-only arguments**: `def func(*, a): pass`
+   
+   The following is not allowed:
+   - ***args**: `def func(*args): pass`
+   - **positional-only arguments**: `def func(a, /): pass`
+   
+3. Only certain JSON-safe type annotations can be used. They are explained in the next section.
 
 #### Allowed types
 
@@ -112,20 +209,3 @@ only share these types within your package, using relative imports.
 Other static analysis tools like `mypy` use a repository with stub files to solve this issue, see
 [https://mypy.readthedocs.io/en/stable/stubs.html](https://mypy.readthedocs.io/en/stable/stubs.html). This is out of the
 scope for a young project like this, at least for now.
-
-#### Rules
-
-1. The functions you want to scan need to be type annotated.
-
-2. Only the types defined in the previous section can be used. They are the types that can be safely serialised as JSON.
-
-3. Function arguments are meant to be passed in key-value format, like a json object. This puts a couple of restrictions
-   regarding *args, **kwargs, positional-only and keyword-only arguments:
-   
-   The following is allowed:
-   - ****kwargs**: `def func(**kwargs): pass`
-   - **keyword-only arguments**: `def func(*, a): pass`
-   
-   The following is not allowed:
-   - ***args**: `def func(*args): pass`
-   - **positional-only arguments**: `def func(a, /): pass`
