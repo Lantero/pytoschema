@@ -16,7 +16,7 @@ setup(
     description="A package to convert Python type annotations into JSON schemas",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    version="1.0.0",
+    version="2.0.0",
     author="Carlos Ruiz Lantero",
     author_email="carlos.ruiz.lantero@comprehensivetech.co.uk",
     maintainer="Carlos Ruiz Lantero",
