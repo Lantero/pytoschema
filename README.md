@@ -2,16 +2,40 @@
 
 # pytoschema
 
-Package that uses static analysis - `ast` - to convert Python 3 function type annotations to JSON schemas.
+1. [Overview](#overview)
 
-- [https://docs.python.org/3/library/typing.html](https://docs.python.org/3/library/typing.html)
-- [https://json-schema.org/](https://json-schema.org/)
+2. [Getting started](#getting-started)
+   
+   1. [Installation](#installation)
 
-This allows you to auto-generate the validation schemas for JSON-RPC backend functions written in Python. For example,
-we can take this snippet:
+      1. [Supported versions](#supported-versions)      
+
+   2. [Scan a package](#scan-a-package)
+   3. [Scan a file](#scan-a-file)
+   4. [Include and exclude patterns](#include-and-exclude-patterns)
+   
+3. [Type annotation rules](#type-annotation-rules)
+
+   1. [Rules](#rules)
+   2. [Allowed annotations](#allowed-annotations)
+      
+      1. [Atomic types](#atomic-types)
+      2. [Composite types](#composite-types)
+   
+   3. [Default function arguments](#default-function-arguments)
+   
+4. [References](#references)
+
+## Overview
+
+This is a Python package that uses static analysis - `ast` - to convert Python type annotations into JSON schemas.
+
+This allows you to auto-generate the validation schemas from backend functions written in Python, so they can be used by
+other layers of your application, normally the frontend. As an example, let's look at this file:
 
 ```python
 from typing import List, Literal, TypedDict
+
 
 class UserProperties(TypedDict, total=False):
    username: str
@@ -24,7 +48,7 @@ def update_user(user_id: str, user_properties: UserProperties):
     pass  # Your function code
 ```
 
-It would produce this JSON schema to be used by other layers of your application, usually the front-end:
+We could now use the library to process this file, and it would create the following JSON schema:
 
 ```json
 {
@@ -70,33 +94,20 @@ It would produce this JSON schema to be used by other layers of your application
 }
 ```
 
-Current support is for Python 3.8+ and JSON schema draft 7+.
-
-## Table of contents
-
-1. [Getting started](#getting-started)
-   
-   1. [Installation](#installation)
-   2. [Scan a package](#scan-a-package)
-   3. [Scan a file](#scan-a-file)
-   4. [Include and exclude patterns](#include-and-exclude-patterns)
-   
-2. [Type annotation rules](#type-annotation-rules)
-
-   1. [Rules](#rules)
-   2. [Allowed types](#allowed-types)
-      
-      1. [Base types](#base-types)
-      2. [Custom types](#custom-types)
-      3. [Importing types from other files](#importing-types-from-other-files)
+This allows you to document and validate your functions in a single place, next to your code, using native Python.
 
 ## Getting started
 
-#### Installation
+### Installation
 
 From a Python 3.8+ environment, run `pip install pytoschema`.
 
-#### Scan a package
+#### Supported versions
+
+- Python 3.8+ 
+- JSON schema draft 7+
+
+### Scan a package
 
 After installing the package, you can open a python terminal from the root of the repo and run:
 
@@ -111,7 +122,7 @@ print(json.dumps(process_package(os.path.join("test", "example")), indent=4))
 
 The example package will be scanned and JSON schemas will be generated for all the top level functions it can find.
   
-#### Scan a file
+### Scan a file
 
 You can also target specific files, which won't include the package namespacing in the result value. Following on the
 same terminal:
@@ -122,7 +133,7 @@ from pytoschema.functions import process_file
 print(json.dumps(process_file(os.path.join("test", "example", "service.py")), indent=4))
 ```
 
-#### Include and exclude patterns
+### Include and exclude patterns
 
 Include and exclude unix-like patterns can be used to filter function and module names we want to allow/disallow for
 scanning. See the difference when you now run this instead:
@@ -148,9 +159,9 @@ Fitting Python's typing model to JSON means not everything is allowed in your fu
 restriction that comes with JSON data serialization. Hopefully, most of the useful stuff you need is allowed, provided
 you follow these simple rules.
 
-#### Rules
+### Rules
 
-1. The functions you want to scan need to be type annotated.
+1. The functions you want to scan need to be type annotated, using the annotations described in the next section.
 
 2. Function arguments are meant to be passed in key-value format, like a json object. This puts a couple of restrictions
    regarding *args, **kwargs, positional-only and keyword-only arguments:
@@ -162,22 +173,97 @@ you follow these simple rules.
    The following is not allowed:
    - ***args**: `def func(*args): pass`
    - **positional-only arguments**: `def func(a, /): pass`
-   
-3. Only certain JSON-safe type annotations can be used. They are explained in the next section.
 
-#### Allowed types
+### Allowed annotations
 
-##### Base types
+#### Atomic types
 
-Basic types `bool`, `int`, `float`, `str`, `None` and `typing.Any` are allowed. Also, you can build more complex, nested
-structures with the usage of `typing.Union`, `typing.Optional`, `typing.Dict` (Only `str` keys are allowed),
-`typing.List` and `typing.Literal`. All these types have a direct, non-ambiguous representation in both JSON and JSON 
-schema.
+See Python type annotations and its JSON schema counterparts.
 
-##### Custom types
+- `bool`
+  ```json
+  {"type": "boolean"}
+  ```
+- `int`
+  ```json
+  {"type": "integer"}
+  ```
+- `float`
+  ```json
+  {"type": "number"}
+  ```
+- `str`
+  ```json
+  {"type": "string"}
+  ```
+- `None`
+  ```json
+  {"type": "null"}
+  ```
+- `typing.Any`
+  ```json
+  {
+      "anyOf": [
+          {"type": "object"},
+          {"type": "array"},
+          {"type": "null"},
+          {"type": "string"},
+          {"type": "boolean"},
+          {"type": "integer"},
+          {"type": "number"}
+      ]
+  }
+  ```
 
-Your functions can also use custom types like the ones defined using an assignment of `typing.Union`, `typing.List`, 
-`typing.Dict`, `typing.Literal` and `typing.Optional`, as in:
+#### Composite types
+
+You can use the following composite types to build more complex validation. These examples are nested with atomic types,
+so they are easy to understand, but you can nest your composite types with other composite types.
+
+- `typing.Dict[str, int]`
+  ```json
+  {
+      "type": "object",
+      "additionalProperties": {
+          "type": "integer"
+      }
+  }
+  ```
+- `typing.List[int]`
+  ```json
+  {
+      "type": "array",
+      "items": {
+          "type": "integer"
+      }
+  }
+  ```
+- `typing.Literal["red", 5, 5.0, None, False]`
+  ```json
+  {
+      "enum": ["red", 5, 5.0, null, false]
+  }
+  ```
+- `typing.Optional[boolean]`
+  ```json
+  {
+      "anyOf": [
+          {"type": "null"},
+          {"type": "boolean"}
+      ]
+  }
+  ```
+- `typing.Union[float, boolean]`
+  ```json
+  {
+      "anyOf": [
+          {"type": "number"},
+          {"type": "boolean"}
+      ]
+  }
+  ```
+
+You can define your own types and re-use them:
 
 ```python
 ServicePort = typing.Union[int, float]
@@ -198,14 +284,86 @@ class Service(typing.TypedDict, total=False):
     debug: bool
 ```
 
-The flag `total=False` is there to indicate that not all properties are required, default is `True`.
+The flag `total=False` is there to indicate that the properties are required, default value is `True`. See the result:
 
-##### Importing types from other files
+```json
+{
+     "type": "object",
+     "additionalProperties": false,
+     "required": [],
+     "properties": {
+         "address": {
+              "type": "string"
+         },
+         "port": {
+              "anyOf": [
+                   {"type": "integer"}, 
+                   {"type": "number"}
+              ]
+         },
+         "config": {
+             "additionalProperties": {
+                 "anyOf": [
+                     {"type": "object"},
+                     {"type": "array"},
+                     {"type": "null"},
+                     {"type": "string"},
+                     {"type": "boolean"},
+                     {"type": "integer"},
+                     {"type": "number"}
+                 ]
+             },
+             "type": "object"
+         },
+         "state": {
+              "enum": ["RUNNING", "STOPPED", "UNKNOWN"]
+         },
+         "tags": {
+              "type": "array",
+              "items": {"type": "string"}
+         },
+         "debug": {
+              "type": "boolean"
+         }
+     }
+}
+```
 
-You can import these custom types within your package and they will be picked up. However, due to the static nature of
-the scan, custom types coming from external packages can't be followed and hence not supported. In other words, you can
-only share these types within your package, using relative imports.
+You can import these user-defined types within your package, and they will be picked up. However, due to the static
+nature of the scan, custom types coming from external packages can't be easily followed and hence not supported yet.
 
-Other static analysis tools like `mypy` use a repository with stub files to solve this issue, see
-[https://mypy.readthedocs.io/en/stable/stubs.html](https://mypy.readthedocs.io/en/stable/stubs.html). This is out of the
-scope for a young project like this, at least for now.
+### Default function arguments
+
+Giving default values to your function arguments would make those properties not required in the output schema.
+
+See this function:
+
+```python
+import typing
+
+
+def my_func(a: str, b: int = 3):
+    pass  # Some code
+```
+
+Now compare it with its JSON schema representation:
+
+```json
+{
+    "my_func": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "a": {"type": "string"},
+            "b": {"type": "integer"}
+        },
+        "required": ["a"],
+        "additionalProperties": false
+    }
+}
+```
+
+## References
+
+- Typing module docs: [https://docs.python.org/3/library/typing.html](https://docs.python.org/3/library/typing.html)
+- JSON schema SPEC: [https://json-schema.org/](https://json-schema.org/)
